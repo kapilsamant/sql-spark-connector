@@ -60,7 +60,25 @@ object BulkCopyUtils extends Logging {
             conn.commit()
             committed = true
         } catch {
-            case e: SQLException =>
+            case e: SQLServerException   => {
+                //Write the iterator data into a file for failed partition
+                //Do it only for SQL state that starts with 22 i.e. Data errors
+                //Write data to /dbfs path with <table_name>_error as file name
+                //Write another file with table name and error messages as logs
+                if (e.getSQLState.toString.startsWith("22")) {
+                    val path = "/dbfs/"+tableName+"_error.txt"
+                    val fileObject = new File(path)     // Creating a file  
+                    val printWriter = new PrintWriter(fileObject)       // Passing reference of file to the printwriter  
+                    printWriter.write(iterator.mkString)  // Writing to the file  
+                    printWriter.close() 
+                    val patherror = "/dbfs/errorMessage.txt"
+                    val fileObjecterror = new File(patherror)     // Creating a file  
+                    val printWritererror = new PrintWriter(fileObjecterror)
+                    val errormessage = tableName+"="+e.getSQLState+"="+e.getErrorCode+"="+e.getMessage     // Passing reference of file to the printwriter  
+                    printWritererror.write(errormessage)  // Writing to the file  
+                    printWritererror.close() 
+                }
+            }
                 handleException(e)
                 throw e
         } finally {
